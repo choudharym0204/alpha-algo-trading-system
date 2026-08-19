@@ -1,0 +1,16 @@
+# Build-context exclusions for the API image (build context = repository root).
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+outputs/
+.cluster/
+.agents/
+node_modules/
+*.db

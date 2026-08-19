@@ -1,0 +1,89 @@
+name: ${COMPOSE_PROJECT_NAME:-alpha-algo-trading-system}
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: ${COMPOSE_PROJECT_NAME:-alpha-algo-trading-system}-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alpha_algo}
+      POSTGRES_USER: ${POSTGRES_USER:-alpha_algo_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace-with-local-dev-password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - alpha-algo
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-alpha-algo-trading-system}-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - alpha-algo
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: ${COMPOSE_PROJECT_NAME:-alpha-algo-trading-system}-prometheus
+    profiles:
+      - observability
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - alpha-algo
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: ${COMPOSE_PROJECT_NAME:-alpha-algo-trading-system}-grafana
+    profiles:
+      - observability
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-replace-with-local-dev-password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - alpha-algo
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  alpha-algo:
+    driver: bridge
+

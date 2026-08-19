@@ -1,0 +1,8 @@
+services:
+  prometheus:
+    profiles:
+      - observability
+
+  grafana:
+    profiles:
+      - observability

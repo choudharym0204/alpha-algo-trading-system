@@ -1,6 +1,6 @@
 # API Architecture
 
-This document is a proposal. No API has been implemented yet.
+This document is partially implemented. The FastAPI foundation, system health/readiness endpoints, request IDs, structured error envelope, request logging, auth/RBAC scaffolding, and WebSocket gateway foundation are implemented. Trading workflows and broker-facing runtime behavior are not implemented.
 
 ## REST Namespaces
 
@@ -71,4 +71,3 @@ Mode constraints:
 - No automatic PAPER to LIVE switching.
 - Paper positions and live positions must never mix.
 - LIVE must remain unavailable until all safety gates are verified.
-

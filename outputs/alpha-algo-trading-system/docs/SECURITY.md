@@ -1,6 +1,6 @@
 # Security Architecture
 
-This document is a proposal. No security implementation currently exists.
+This document is partially implemented. Identity/RBAC database schema and fail-closed auth/RBAC API scaffolding exist. Production credential handling, session management, broker secret storage, live safety workflows, and full audit runtime behavior are not implemented.
 
 ## Non-Negotiable Security Boundaries
 
@@ -72,4 +72,3 @@ LIVE mode remains disabled until these areas are implemented and verified:
 - Audit logging.
 - Monitoring.
 - Security checks.
-
