@@ -114,6 +114,16 @@ class PaperBrokerAdapter(BrokerAdapter):
         clears the connected flag — it does not fake tearing anything down."""
         self._connected = False
 
+    def set_reference_price(
+        self, instrument_id: UUID, reference: PaperReferencePrice
+    ) -> None:
+        """Replace the injected reference for one instrument (simulated market step).
+
+        Enables a deterministic, time-ordered market sequence for replay; never
+        fetches market data.
+        """
+        self._reference_prices[instrument_id] = reference
+
     async def get_quote(self, instrument_id: UUID) -> BrokerQuote:
         """Market data is not supported by the paper broker.
 

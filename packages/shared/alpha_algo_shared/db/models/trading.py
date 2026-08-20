@@ -297,6 +297,9 @@ class Position(TimestampMixin, Base):
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'open'"))
+    # Phase-11: durable execution identity of the last applied fill (restart /
+    # reconciliation reference). It is a reference, not a financial field.
+    last_execution_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class TradingIntentRecord(TimestampMixin, Base):

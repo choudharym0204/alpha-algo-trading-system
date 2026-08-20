@@ -13,6 +13,9 @@ paper trading feature. It contains no P&L, no slippage/commission models, no
 market-data ingestion, no working orders, no persistence, no broker/network
 access, and no way to select LIVE mode. ``PAPER_TRADING_VERIFIED`` (a LIVE
 safety gate) remains TODO; LIVE remains disabled and unavailable.
+
+The operational runtime (accounts, funds, runs, costs, mode routing, service,
+persistence) lives in ``alpha_algo_paper_runtime`` (Phase 15).
 """
 
 from alpha_algo_paper_trading.book import (

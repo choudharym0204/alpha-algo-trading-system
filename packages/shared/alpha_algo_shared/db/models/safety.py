@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -115,6 +115,7 @@ class PortfolioSnapshot(TimestampMixin, Base):
             "snapshot_at",
             name="uq_portfolio_snapshots_account_mode_snapshot_at",
         ),
+        Index("ix_portfolio_snapshots_account_mode", "broker_account_id", "trading_mode"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -129,6 +130,16 @@ class PortfolioSnapshot(TimestampMixin, Base):
     cash_balance: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     realized_pnl: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
     unrealized_pnl: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    # Phase-12 portfolio aggregates (queryable facts, not a P&L engine).
+    market_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    gross_exposure: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    net_exposure: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    long_exposure: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    short_exposure: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    position_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    available_margin: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    used_margin: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     snapshot_payload: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
 
 

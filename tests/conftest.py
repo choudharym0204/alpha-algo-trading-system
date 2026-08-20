@@ -22,6 +22,11 @@ for candidate in (
     ROOT / "services" / "signal_engine",
     ROOT / "services" / "trading_engine",
     ROOT / "services" / "oms",
+    ROOT / "services" / "position_engine",
+    ROOT / "services" / "portfolio_engine",
+    ROOT / "services" / "pnl_engine",
+    ROOT / "services" / "reconciliation_engine",
+    ROOT / "services" / "broker_adapters",
 ):
     candidate_str = str(candidate)
     if candidate_str not in sys.path:

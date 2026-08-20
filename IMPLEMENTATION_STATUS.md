@@ -86,6 +86,155 @@ Schema: `migrations/versions/20260819_execution.py` adds `execution_attempts` (u
 
 ---
 
+## 0j. Phase 10 - Broker Adapters (COMPLETE)
+
+Phase 10 was implemented and verified on 2026-08-20 (see `P10-session-report.md` and `review.md`). The broker-adapter layer — the **translation and isolation boundary** behind the Phase-9 Execution Engine — is now **TESTED** (implemented + unit-tested + contract-tested + 4-axis-adversarial-review-fixed).
+
+It adds a universal broker framework (`services/broker_adapters/alpha_algo_broker_integration/`) and three concrete adapters:
+
+- **Universal contract** — `BrokerAdapter` Protocol (auth/connect/health/reconnect/orders/account), `BrokerCapabilities` (full capability model), `BrokerOrderRequest`/`BrokerOrderResponse` (normalized), `BrokerPositionSnapshot`/`BrokerHoldingSnapshot`/`BrokerFundsSnapshot`, `BrokerConnectionConfig` (incl. static-IP prerequisite), `BrokerCredentialsRef` (opaque ref, no secret values).
+- **Error model** — `BrokerError` + `BrokerErrorClass` (AUTHENTICATION/AUTHORIZATION/RATE_LIMIT/VALIDATION/ORDER_REJECTED/TIMEOUT/NETWORK/PROVIDER_UNAVAILABLE/NOT_FOUND/UNSUPPORTED/DUPLICATE/UNKNOWN) + retryability classification.
+- **Connection lifecycle** — DISCONNECTED→CONNECTING→CONNECTED→DEGRADED→RECONNECTING with bounded, jittered backoff; reconnect never duplicates orders.
+- **Rate limiting** — per-scope token-bucket, provider-specific policies.
+- **Instrument/symbol mapping** — `BrokerInstrument` + `InstrumentMapping` (resolve + validate before submission; never guesses a broker instrument).
+- **Order/product-type isolation** — unsupported order/product types rejected (`UNSUPPORTED`), never silently downgraded (e.g. Upstox has no NRML).
+- **Event normalization + dedup** — `NormalizedBrokerEvent` + `EventDeduplicator` (duplicate → drop; same identity + different payload → conflict).
+- **Concrete adapters** — Zerodha (Kite Connect v3), Upstox (API v2), Angel One (SmartAPI). Each has provider-specific status/error/order-type/product mapping + response/event parsers + auth (OAuth token / bearer / loginByPassword) isolated behind the boundary.
+
+**LIVE safety is preserved**: `LIVE` trading mode is refused (`UNSUPPORTED`), `GLOBAL_TRADING_HALT` blocks all submission (fail-closed), no credentials are hardcoded/committed/logged, and no real broker SDK/secret is used in tests (fake placeholders only). Provider constraints are modelled explicitly: Zerodha (static IP since 2025-04-01) and Angel One (static IP since 2026-04-01) for order execution; Upstox V3 WebSocket (V2 discontinued 2025-08-22) + sandbox.
+
+Full suite: **1194 tests passing** (Phase 10 added 77 tests over the 1117-test Phase-9 baseline). Live broker connectivity/credentials remain deferred (no real providers in this environment); adapters are unit/mocked-tested. Phase 11 (Position Engine) is now **COMPLETE — TESTED** (see §0k).
+
+---
+
+## 0k. Phase 11 - Position Engine (COMPLETE)
+
+Phase 11 was implemented and verified on 2026-08-20 (see `P11-session-report.md` and `review.md`). The **Position Engine** — the durable, authoritative, idempotent state boundary between the Execution Engine and the future Portfolio/P&L/Reconciliation phases — is now **TESTED** (implemented + unit/arithmetic/identity/concurrency/repository/schema/security/E2E-tested + 4-axis-adversarial-review-fixed).
+
+It adds `services/position_engine/alpha_algo_position_engine/` (contracts, identity, arithmetic, engine, repository, metrics, errors) and a migration adding `positions.last_execution_id` (`migrations/versions/20260820_position_engine.py`).
+
+- **Canonical identity** = `(strategy_run_id, instrument_id, trading_mode)` (preserves the existing `uq_positions_*` constraint; `broker_account_id` is a recorded attribute, not a key).
+- **Lifecycle** = FLAT / OPEN / CLOSED (derived from net quantity; `PARTIALLY_CLOSED` is derivable, not stored).
+- **Long-only** — BUY opens/increases; SELL decreases/closes; short + flip rejected (`PositionOverCloseError`), never negative, never silently downgraded.
+- **Weighted average entry** using exact `Decimal` arithmetic (4 dp, half-even).
+- **Idempotent** — `position_events.source_event_id` (unique) is the durable execution-identity backstop; duplicate → no-op, conflict → preserved + evidence + `PositionConflictError`.
+- **Atomic + concurrent-safe** — position + event committed in one transaction; per-key lock (in-process) + `SELECT … FOR UPDATE` + unique constraints (cross-process); restart-reconstructable.
+- **Boundary** — consumes normalized `PositionFill` (never broker SDK/payloads), never overwrites internal state from broker snapshots, never computes P&L (`realized_pnl`/`unrealized_pnl` left NULL — Phase 13 owns them), never enables LIVE.
+
+Full suite: **1248 tests passing** (Phase 11 added 54 tests over the 1194-test Phase-10 baseline). Live PostgreSQL row-lock verification remains deferred (no Docker in this environment). Phase 12 (Portfolio Engine) is **not** started.
+
+---
+
+## 0l. Phase 12 - Portfolio Engine (COMPLETE)
+
+Phase 12 was implemented and verified on 2026-08-20 (see `P12-session-report.md` and `review.md`). The **Portfolio Engine** — the broker-independent, deterministic, durable aggregation layer over authoritative positions + funds + reference prices — is now **TESTED** (implemented + identity/aggregation/exposure/market-value/funds/snapshot/concurrency/security/schema/E2E-tested + 4-axis-adversarial-review-fixed).
+
+It adds `services/portfolio_engine/alpha_algo_portfolio_engine/` (contracts, errors, identity, aggregation, engine, repository, metrics, adapters), new queryable aggregate columns on `portfolio_snapshots` (`market_value`, `gross_exposure`, `net_exposure`, `long_exposure`, `short_exposure`, `position_count`, `available_margin`, `used_margin`, `status` + a `(broker_account_id, trading_mode)` index), and a migration (`migrations/versions/20260820_portfolio_engine.py`, down_revision `20260820_position_engine`).
+
+- **Identity** = `(broker_account_id, trading_mode)`; snapshot = portfolio + `snapshot_at`; preserves `uq_portfolio_snapshots_account_mode_snapshot_at` as the durable boundary.
+- **Aggregation** = exact `Decimal` (4-dp half-even); gross/net/long/short exposure; market value from normalized reference price (never average entry); open positions only.
+- **Freshness** = FRESH/STALE/MISSING; missing → flagged + excluded (PARTIAL/DEGRADED), stale/future → flagged + DEGRADED; never fabricated zeros.
+- **Funds/margin** = normalized `FundsState`; unavailable → `None` (never zero); margin reported as facts (Risk consumes, not re-ruled).
+- **Snapshots** = append-only, atomic COMMIT; idempotent via unique constraint; deterministic recalculation; restart-reconstructable; on-demand only (no scheduler loop).
+- **Boundary** = no P&L (`realized_pnl`/`unrealized_pnl` left NULL — Phase 13 owns them), no reconciliation (Phase 14), no broker calls, LIVE/unknown mode fail-closed.
+
+Full suite: **1290 tests passing** (Phase 12 added 42 tests over the 1248-test Phase-11 baseline). Live PostgreSQL verification remains deferred (no Docker in this environment). Phase 13 (P&L Engine) is **not** started.
+
+---
+
+## 0m. Phase 13 - P&L Engine (COMPLETE)
+
+Phase 13 was implemented and verified on 2026-08-20 (see `P13-session-report.md` and `review.md`). The **P&L Engine** — deterministic, auditable, broker-independent realized + unrealized P&L derived from authoritative execution/position facts — is now **TESTED** (implemented + accounting/unrealized/engine/aggregation/concurrency/security/schema/E2E-tested + 4-axis-adversarial-review-fixed).
+
+It adds `services/pnl_engine/alpha_algo_pnl_engine/` (contracts, errors, identity, accounting, unrealized, aggregation, engine, repository, metrics), new tables `pnl_events` (append-only realized facts, `execution_id` unique) and `pnl_snapshots` (account-scoped read model), and a migration (`migrations/versions/20260820_pnl_engine.py`, down_revision `20260820_portfolio_engine`).
+
+- **Accounting** = Weighted Average Cost (long-only); consumes Phase 11's authoritative average cost as the realized cost basis (never recomputes position truth).
+- **Realized** = `(sell − avg_cost) × closed_qty`, net = gross − sell-side costs; exact `Decimal` (4-dp half-even).
+- **Unrealized** = mark-to-market `(ref − avg) × open_qty` with Phase 3/12 freshness (missing/invalid → UNAVAILABLE, stale/future → DEGRADED).
+- **Idempotency** = `pnl_events.execution_id` unique; duplicate → no-op, same identity + different payload → CONFLICT (original preserved).
+- **Aggregation** = trade→position→strategy→account (sum of facts, no double-counting); daily P&L with configurable timezone.
+- **Boundary** = no reconciliation (Phase 14), no broker calls, no P&L from UI/cache, historical facts immutable, LIVE/unknown mode fail-closed.
+
+Full suite: **1349 tests passing** (Phase 13 added 59 tests over the 1290-test Phase-12 baseline). Live PostgreSQL verification remains deferred (no Docker in this environment). Phase 14 (Reconciliation Engine) is **not** started.
+
+---
+
+## 0n. Phase 14 - Reconciliation Engine (COMPLETE)
+
+Phase 14 was implemented and verified on 2026-08-20 (see `P14-session-report.md` and `review.md`). The **Reconciliation Engine** — durable, deterministic, auditable comparison of internal authoritative state against broker observations — is now **TESTED** (implemented + order/execution/position/funds reconciliation + idempotency/concurrency/security/schema/E2E-tested + 4-axis-adversarial-review-fixed).
+
+It adds `services/reconciliation_engine/alpha_algo_reconciliation_engine/` (contracts, errors, identity, tolerance, matching, engine, repository, metrics, adapters), new tables `reconciliation_runs` + `reconciliation_discrepancies` (append-only evidence, unique `discrepancy_key`), and a migration (`migrations/versions/20260820_reconciliation_engine.py`, down_revision `20260820_pnl_engine`).
+
+- **Principle** = observation + correction-control; never silently overwrites internal financial truth.
+- **Matching** = identity-first (broker order/execution ID → client ID → internal identity); deterministic; MATCH counted, non-MATCH persisted as evidence.
+- **Taxonomy/severity** = smallest-useful `DiscrepancyKind`; INFO/WARNING/HIGH/CRITICAL (unexpected broker fill = CRITICAL).
+- **Tolerance** = narrow, explicit, configurable (price/fee/funds epsilon + timestamp skew); stale/unavailable never fabricated as zero.
+- **Corrective workflow** = broker-only fill → `ROUTE_BROKER_FILL` recovery action → existing execution boundary; no direct position/P&L/portfolio mutation.
+- **Idempotency** = unique `discrepancy_key`; replay → no duplicate, same identity + different evidence → CONFLICT (original preserved).
+- **Boundary** = no broker SDK/provider branch, no new accounting engine, LIVE/unknown mode + global halt fail-closed.
+
+Full suite: **1412 tests passing** (Phase 14 added 63 tests over the 1349-test Phase-13 baseline). Live PostgreSQL verification remains deferred (no Docker in this environment).
+
+---
+
+## 0o. Phase 15 - Paper Trading Completion (COMPLETE)
+
+Phase 15 was implemented and verified on 2026-08-20 (see `P15-session-report.md` and `review.md`). The **Paper Trading runtime** — the operational layer that completes the paper lifecycle on top of the P8-001 deterministic simulator foundation — is now **TESTED** (account/funds/run/costs/routing/service/persistence implemented + unit/E2E/determinism/isolation/security/schema-tested + 4-axis-adversarial-review-fixed).
+
+It adds `services/paper_trading/alpha_algo_paper_runtime/` (account, funds, run, costs, routing, service, repository), three paper-specific tables `paper_runs` + `paper_accounts` + `paper_funds` (no duplicate order/execution/position storage), and a migration (`migrations/versions/20260820_paper_trading.py`, down_revision `20260820_reconciliation_engine`).
+
+- **Account/run** = explicit PAPER account (pinned mode, explicit starting capital) + `paper_run_id` isolation + deterministic config-hash replay.
+- **Funds** = deterministic cash/reserve ledger (never negative); insufficient-funds is a service-level pre-submission guard.
+- **Cost model** = explicit (default ZERO) slippage (FIXED_BPS) + commission (FIXED_PER_TRADE); no tax formulas invented.
+- **Mode routing** = BACKTEST/PAPER/LIVE; LIVE fail-closed, unknown/missing fail loud, never UI-string driven.
+- **Service** = orchestrates account + funds + paper broker + cost model; fills flow through the broker → execution-events boundary (no direct Position/P&L mutation).
+- **Persistence** = `SqlPaperRepository` + in-memory double; funds restart recovery tested.
+- **Reconciliation** = paper state reconciles through Phase 14 (funds + positions E2E-tested).
+
+Full suite: **1476 tests passing** (Phase 15 added 64 tests over the 1412-test Phase-14 baseline). Live PostgreSQL verification remains deferred (no Docker in this environment). Phase 16 (Backtesting Expansion) is **not** started.
+
+---
+
+## 0p. Phase 16 - Backtesting Expansion (COMPLETE)
+
+Phase 16 was implemented and verified on 2026-08-20 (see `P16-session-report.md` and `review.md`). The deterministic backtesting subsystem was expanded with **six additive packages** (no existing engine file was modified):
+
+- **`backtesting/alpha_algo_backtest_analytics/`** - advanced metrics: CAGR (explicit periods-per-year basis), historical VaR/CVaR (order-statistic, confidence-configurable), CAPM Alpha/Beta (aligned benchmark required), per-trade MFE/MAE (strict `(entry, exit]` window), and a composite `compute_advanced_metrics`.
+- **`backtesting/alpha_algo_backtest_quality/`** - observational data-quality classification into `VALID` / `QUARANTINED` / `REJECTED` (out-of-order, duplicate, future-dated, gap, identity/timeframe drift, OHLC/tick sanity); no silent repair.
+- **`backtesting/alpha_algo_backtest_optimize/`** - deterministic lexicographic grid search (first-evaluation tie-break, train/test separation by caller-closure) + reproducible seeded bootstrap Monte Carlo (SHA-256-derived PRNG, no `random` module).
+- **`backtesting/alpha_algo_backtest_persistence/`** - optional outer-layer run identity (canonical SHA-256, wall-clock excluded) + stable JSON record + in-memory store with duplicate/conflict semantics + result-cache key.
+- **`backtesting/alpha_algo_backtest_portfolio/`** - multi-symbol, shared-capital, long-only portfolio simulation with explicit capital allocation (reserved-cash floor + per-symbol budget caps); `(timestamp, symbol)`-sorted global timeline; reuses the single-engine fill/cost/FIFO semantics.
+- **`backtesting/alpha_algo_backtest_latency/`** - deterministic latency model (signal/decision/submission/fill components) that shifts intent effective-decision time (simulation-time controlled, no wall-clock sleep).
+
+**Explicitly DEFERRED / UNSUPPORTED** (documented in `P16-session-report.md` and `review.md`): STOP/STOP_LIMIT (intra-bar trigger unknowable on candle data), partial fills (would entangle 1:1 intent→outcome accounting), market impact (no defensible data/requirements), short selling / position flip (production Position Engine rejects short/flip), multi-timeframe data, corporate actions (`UNSUPPORTED / DOCUMENTED`), parallel optimization (sequential only).
+
+**LIVE safety preserved**: `BacktestTradingMode` remains single-member (`BACKTEST`); no broker/network/live imports (AST-scanned); no wall-clock/random/os usage; persistence is an in-memory/JSON outer layer (no filesystem/DB writes); long-only sim rejects short/flip. Determinism and look-ahead protection verified end-to-end.
+
+Full suite: **1611 tests passing** (Phase 16 added 135 tests over the 1476-test Phase-15 baseline), 1 pre-existing warning (FastAPI deprecation). Live PostgreSQL verification remains deferred (no Docker in this environment). Phase 17 (Web Platform) is **not** started.
+
+---
+
+## 0q. Phase 17 - Web Platform (COMPLETE)
+
+Phase 17 was implemented and verified on 2026-08-20 (see `P17-session-report.md`, `review.md`, and `apps/web/README.md`). The **Web Trading Terminal** (`apps/web/`) — a presentation/control layer consuming the backend only through authenticated REST + WebSocket — is now **TESTED** (implemented + unit/component-tested + production-build-verified + 4-axis-adversarial-review-fixed).
+
+**Honest scope (backend contract discovery):** the backend exposes only auth (`/api/v1/auth/login|refresh|me`), system (`/system/health|ready|request-id`), and an authenticated WebSocket gateway (`/api/v1/ws` → `HEALTH_UPDATE`). There are **no** trading-data endpoints yet (orders, positions, portfolio, P&L, strategies, risk, brokers, reconciliation, market data, watchlist).
+
+What was built:
+- **Auth** — real login/refresh/me/logout/session-restore/expiry/401/403 against the backend contract; tokens held **in memory only** (backend returns JSON tokens, sets no httpOnly cookie).
+- **RBAC** — `system:read` gates the shell, `trading:view` gates trading areas; server 401/403 remains the authority.
+- **Protected routing + app shell** — sidebar (permission-filtered), topbar, **PAPER/LIVE mode badge** (fail-closed from `health.live_trading`), WebSocket connection indicator, session controls, toast notifications.
+- **Dashboard** — real system health/readiness (`service`, `api`/`database`/`broker` checks), LIVE-safety panel, real-time `HEALTH_UPDATE`; trading metrics shown **Unavailable** (never zero).
+- **Design system** — Button/Input/Select/Modal/Table/Badge/Tabs/Toast/Tooltip/Skeleton/Empty/Error/Status (dot+text, non-color-only).
+- **REST client** (typed, parses structured error envelope) + **WebSocket client** (reconnect + typed event validation).
+- **Routes** — `login`, `dashboard` (real), `settings` (real session/permissions), and `markets…alerts` as honest Unavailable states.
+
+**LIVE safety preserved:** `live_trading` reflect-only (no toggle, no LIVE path); broker credentials/tokens never reach the browser; no broker/DB access from the browser.
+
+Verification: **29 web tests passing** (7 files); production build green (19 routes, strict TypeScript); backend regression unchanged at **1611 passed** (1 pre-existing warning). Live backend E2E and trading-data wiring remain deferred (no Docker/PostgreSQL; no backend trading-data endpoints). Phase 18 (Mobile) is **not** started.
+
+---
+
 ## 1. Current Product Maturity Level
 
 **LEVEL 1 — FOUNDATION.**
@@ -358,41 +507,58 @@ Columns: `Capability | Current Status | Target Phase | Owner/Module | Dependenci
 
 > Phase 9 capabilities are marked **TESTED** (implemented + unit-tested + integration-tested + 4-axis-review-fixed). Concrete broker adapters are deferred to Phase 10; the engine ends at a provider-neutral `ExecutionAdapter` boundary with a deterministic TEST adapter. Live PostgreSQL connectivity remains deferred (in-memory execution store mirrors the transactional + unique-constraint semantics).
 
-### 5.10 Broker Integration (Phase 10)
+### 5.10 Broker Integration (Phase 10 — COMPLETE)
 
 | Capability | Current Status | Target Phase | Owner/Module | Dependencies | Verification Requirement |
 |---|---|---|---|---|---|
-| BrokerAdapter Protocol + concrete adapters | PARTIAL | 10 | `packages/broker_adapters/.../contracts.py` | — | Protocol; only PaperBrokerAdapter concrete |
-| Capability-gated providers | PARTIAL | 10 | `contracts.py` (BrokerCapabilities) | — | Paper reports supports_live_trading=False |
-| No scattered broker branching | PRODUCTION | 10 | `broker_adapters/` | — | import isolated behind Protocol |
+| BrokerAdapter Protocol + concrete adapters | TESTED | 10 | `services/broker_adapters/` (Zerodha/Upstox/Angel One) | `alpha_algo_broker_integration` | 3 adapters pass the universal contract suite |
+| Capability-gated providers | TESTED | 10 | `contracts.py` (BrokerCapabilities) | capability descriptor | unsupported op → `UNSUPPORTED` |
+| No scattered broker branching | PRODUCTION | 10 | `broker_adapters/` | — | core engine has no `broker ==` branching |
+| Authentication/session isolation | TESTED | 10 | per-adapter `authenticate`/`validate_session` | credential resolver | creds never leave the adapter boundary |
+| Connection/reconnect lifecycle | TESTED | 10 | `connection.py` (ConnectionStateMachine) | bounded backoff | DISCONNECTED→…→RECONNECTING; no order dup |
+| Order mapping (type/product/status) | TESTED | 10 | per-broker `mapping.py` | universal enums | explicit maps; no silent downgrade |
+| Instrument/symbol mapping | TESTED | 10 | `mapping.py` (InstrumentMapping) | broker token/key | missing/ambiguous mapping → REJECT |
+| Response/error normalization | TESTED | 10 | per-broker `mapping.map_error` | BrokerError model | provider payload → universal, tested |
+| Event stream normalization + dedup | TESTED | 10 | `events.py` (EventDeduplicator) | stable event identity | duplicate drop; conflict on reuse |
+| Rate limiting | TESTED | 10 | `ratelimit.py` (per-scope token bucket) | provider limits | bounded throttling |
+| Secure credential handling | TESTED | 10 | `BrokerCredentialsRef` + resolver | secret refs | no hardcoded/committed/logged secrets |
+| LIVE gating | TESTED | 10 | `base.py` (guards) | `LIVE_TRADING_ENABLED=false` | LIVE request → blocked even with creds |
+
+> Phase 10 capabilities are marked **TESTED** (implemented + unit/contract-tested + 4-axis-review-fixed). Live broker connectivity/credentials and real sandbox verification are deferred (no real providers in this environment); adapters are mocked-tested only. No adapter is marked PRODUCTION — that requires real provider/sandbox + controlled-live validation (Phase 24+).
 
 ### 5.11 Position / Portfolio / P&L / Reconciliation (Phases 11–14)
 
 | Capability | Current Status | Target Phase | Owner/Module | Dependencies | Verification Requirement |
 |---|---|---|---|---|---|
-| Position engine (live, authoritative) | PARTIAL | 11 | `paper_trading/` (PaperPosition/PaperOrderBook); `positions` table (schema) | execution-event wiring; P&L engine; DB runtime | live position from events + persisted |
-| Portfolio engine | MISSING | 12 | `services/portfolio_engine/` (`.gitkeep`); `portfolio_snapshots` (schema) | position + P&L engines | value/cash/exposure/allocation/drawdown persisted |
-| P&L engine (live) | MISSING | 13 | (backtest-only FIFO P&L in `backtesting/.../ledger.py`) | position/fill records; CostModel | realized+unrealized+net at trade/strategy/account/daily |
-| Reconciliation | MISSING | 14 | `services/reconciliation_engine/` (`.gitkeep`) | orders/executions/positions/funds/P&L | mismatch detection + persisted events + no silent overwrite |
+| Position engine (live, authoritative) | TESTED | 11 | `services/position_engine/` (PositionEngine/PositionRepository); `positions` + `position_events` (schema) | normalized fill events; P&L engine; DB runtime | live position from events + persisted + idempotent |
+| Portfolio engine | TESTED | 12 | `services/portfolio_engine/` (PortfolioEngine/PortfolioRepository); `portfolio_snapshots` (schema) | position engine + funds snapshots + reference prices | value/cash/exposure/allocation persisted + idempotent + deterministic |
+| P&L engine (live) | TESTED | 13 | `services/pnl_engine/` (PnlEngine/PnlRepository); `pnl_events` + `pnl_snapshots` (schema) | position/fill records; normalized reference prices; cost data | realized+unrealized+net at trade/strategy/account/daily; weighted-average cost; idempotent |
+| Reconciliation | TESTED | 14 | `services/reconciliation_engine/` (ReconciliationEngine/ReconciliationRepository); `reconciliation_runs` + `reconciliation_discrepancies` (schema) | orders/executions/positions/funds; Phase 10 normalized observations | mismatch detection + persisted evidence + no silent overwrite + controlled recovery |
 
 ### 5.12 Simulation (Phases 15–16)
 
 | Capability | Current Status | Target Phase | Owner/Module | Dependencies | Verification Requirement |
 |---|---|---|---|---|---|
-| Paper trading (full path) | PARTIAL | 15 | `services/paper_trading/` | strategy/signal/risk/OMS runtime + persistence + P&L | end-to-end paper through P&L, as pre-live gate |
-| Backtesting (deterministic) | PRODUCTION | 16 | `backtesting/` (4 packages) | contracts; Decimal foundation | identical inputs → identical results; no-live-access |
+| Paper trading (full path) | TESTED | 15 | `services/paper_trading/alpha_algo_paper_runtime/` (account/funds/run/costs/routing/service/repository) + `paper_runs`/`paper_accounts`/`paper_funds` (schema) | paper broker foundation; Phase 14 reconciliation; position engine | BUY→HOLD→SELL→CLOSE lifecycle + funds + reconciliation; LIVE fail-closed |
+| Backtesting (deterministic) | PRODUCTION | 16 | `backtesting/` (P7-001 foundation, P7-002 engine, P7-004 reports, P7-003 walk-forward) | contracts; Decimal foundation | identical inputs → identical results; no-live-access |
+| Backtesting — advanced metrics (CAGR, VaR/CVaR, Alpha/Beta, MFE/MAE) | TESTED | 16 | `backtesting/alpha_algo_backtest_analytics/` | engine equity/return series | defined formulas; edge cases; determinism |
+| Backtesting — data quality | TESTED | 16 | `backtesting/alpha_algo_backtest_quality/` | contracts | valid/quarantined/rejected classification; no silent repair |
+| Backtesting — optimization + Monte Carlo | TESTED | 16 | `backtesting/alpha_algo_backtest_optimize/` | engine; walk-forward | deterministic grid; train/test separation; seeded reproducibility |
+| Backtesting — persistence/identity/caching | TESTED | 16 | `backtesting/alpha_algo_backtest_persistence/` | engine identity | optional outer layer; duplicate/conflict; reproducible run id |
+| Backtesting — multi-symbol portfolio + capital allocation | TESTED | 16 | `backtesting/alpha_algo_backtest_portfolio/` | engine fill/cost/FIFO | shared capital; reserved-cash floor; budget caps; long-only |
+| Backtesting — latency model | TESTED | 16 | `backtesting/alpha_algo_backtest_latency/` | engine intents | deterministic delay; simulation-time controlled |
 
 ### 5.13 Platform (Phases 17–19)
 
 | Capability | Current Status | Target Phase | Owner/Module | Dependencies | Verification Requirement |
 |---|---|---|---|---|---|
-| Web — auth | MISSING | 17 | `apps/web/` (`.gitkeep`) | backend auth | login vs real backend |
-| Web — dashboard | MISSING | 17 | `apps/web/` (`.gitkeep`) | API + WS | live portfolio rendered |
-| Web — watchlist | MISSING | 17 | `apps/web/` (`.gitkeep`) | market-data API | stream quotes |
-| Web — market data & charts | MISSING | 17 | `apps/web/` (`.gitkeep`) | market-data runtime + charts | charts render ticks/candles |
-| Web — positions/orders/portfolio/P&L | MISSING | 17 | `apps/web/` (`.gitkeep`) | engines | live state rendered |
-| Web — Tier 2 | MISSING | 17 | `apps/web/` (`.gitkeep`) | risk/broker/alerts APIs | Tier 2 screens |
-| Web — Tier 3 | MISSING | 17 | `apps/web/` (`.gitkeep`) | backtesting/audit/admin | Tier 3 screens |
+| Web — auth | TESTED | 17 | `apps/web/` (login/refresh/me/RBAC) | backend auth | login/refresh/me/logout/expiry/401/403 vs real backend contract |
+| Web — dashboard | PARTIAL | 17 | `apps/web/` (`(app)/dashboard`) | API + WS | real health/readiness/mode/WS rendered; trading metrics Unavailable (no backend endpoint) |
+| Web — watchlist | PARTIAL | 17 | `apps/web/` (`(app)/watchlist`) | market-data API | shell + honest Unavailable (no backend endpoint) |
+| Web — market data & charts | PARTIAL | 17 | `apps/web/` (`(app)/markets`, `charts`) | market-data runtime + charts | shell + honest Unavailable (no backend endpoint) |
+| Web — positions/orders/portfolio/P&L | PARTIAL | 17 | `apps/web/` (`(app)/positions`…`pnl`) | engines | shell + honest Unavailable (no backend endpoint) |
+| Web — Tier 2 | PARTIAL | 17 | `apps/web/` (`(app)/risk`, `brokers`, `alerts`, `reconciliations`) | risk/broker/alerts APIs | shell + honest Unavailable (no backend endpoint) |
+| Web — Tier 3 | PARTIAL | 17 | `apps/web/` (settings) | backtesting/audit/admin | session/permissions rendered; backtesting/admin Unavailable |
 | Mobile — Tier 1 | MISSING | 18 | (no `apps/mobile`) | backend contracts | Flutter app vs API |
 | Mobile — Tier 2 | MISSING | 18 | (no `apps/mobile`) | Tier 1 + risk/alert APIs | Tier 2 screens |
 | Mobile — Tier 3 | MISSING | 18 | (no `apps/mobile`) | backtesting API | Tier 3 screens |
@@ -420,9 +586,9 @@ Columns: `Capability | Current Status | Target Phase | Owner/Module | Dependenci
 
 ## 6. Summary Counts
 
-- **Total capabilities tracked:** ~153 (Foundation 12 · Database 11 · Market Data 13 · Strategy 11 · Signal 11 · Risk 28 · Orchestrator 13 · OMS 15 · Execution 9 · Broker 3 · Position/Portfolio/P&L/Reconciliation 4 · Simulation 2 · Platform 12 · Operations/Live 9).
+- **Total capabilities tracked:** ~168 (Foundation 12 · Database 11 · Market Data 13 · Strategy 11 · Signal 11 · Risk 28 · Orchestrator 13 · OMS 15 · Execution 9 · Broker 12 · Position/Portfolio/P&L/Reconciliation 4 · Simulation 8 · Platform 12 · Operations/Live 9).
 - **PRODUCTION today:** deterministic backtesting; migration scripts; secure-error envelope; core market-data contracts + dedup/staleness helpers; signal/strategy contracts + versioning + runtime isolation; 20 risk rule classes (14 core + 6 configurable) + fail-closed defaults; 11-state order lifecycle + event engine.
-- **MISSING today (highest-impact):** concrete brokers, portfolio/P&L/reconciliation engines, web/mobile/desktop, tracing/alerts/CI, and all LIVE release paths. (Phase 1 auth/RBAC/CORS/rate-limit + ASGI/psycopg, Phase 2 DB runtime, Phase 3 market-data runtime, Phase 4 strategy runtime, Phase 5 signal engine, Phase 6 live risk engine, Phase 7 trading orchestrator, Phase 8 OMS, and Phase 9 execution engine are now **TESTED**.)
+- **MISSING today (highest-impact):** mobile/desktop, tracing/alerts/CI, and all LIVE release paths. (Phase 1 auth/RBAC/CORS/rate-limit + ASGI/psycopg, Phase 2 DB runtime, Phase 3 market-data runtime, Phase 4 strategy runtime, Phase 5 signal engine, Phase 6 live risk engine, Phase 7 trading orchestrator, Phase 8 OMS, Phase 9 execution engine, Phase 10 broker adapters, Phase 11 position engine, Phase 12 portfolio engine, Phase 13 P&L engine, Phase 14 reconciliation engine, Phase 15 paper trading runtime, and Phase 16 backtesting expansion are now **TESTED**. Phase 17 web terminal: **auth TESTED** + app shell/system-health/WS **PARTIAL** — trading-data screens honest Unavailable pending backend endpoints.)
 
 ---
 
