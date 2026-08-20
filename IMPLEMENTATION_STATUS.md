@@ -52,6 +52,40 @@ Phase 7 was implemented and verified on 2026-08-19 (see `.cluster/alpha-algo-pha
 
 ---
 
+## 0h. Phase 8 - Order Management System (COMPLETE)
+
+Phase 8 was implemented and verified on 2026-08-19 (see `P8-session-report.md` and `review.md`). The OMS - the internal order-management boundary between the Phase-7 Trading Orchestrator and the future Phase-9 Execution Engine - is now **TESTED** (implemented + unit-tested + integration-tested + 4-axis-adversarial-review-fixed).
+
+It transforms a Phase-7 `TradingIntent` into a durable internal `Order`, drives the existing 11-state `OrderLifecycle` from INTENT_CREATED -> INTERNAL_ORDER_CREATED -> SUBMISSION_REQUESTED, persists append-only `order_events`, and stops at an explicit `ExecutionBoundary` (Execution Port only). Deterministic order identity (`order_identity_key` SHA-256 + deterministic `client_order_id` + correlation id + broker-order-id placeholder), durable intent-consumption idempotency (replay -> existing order returned; same orchestration_id + different payload -> CONFLICT), transactional order+event creation (COMMIT = truth; unique-constraint backstop for exactly-one-order concurrency), risk-approval binding re-verified before SUBMISSION_REQUESTED, and GLOBAL_TRADING_HALT + LIVE-mode fail-closed gating are all enforced.
+
+The OMS introduces **no broker SDK / credentials / API calls / real submission / forged BROKER_ACKNOWLEDGED or FILLED**. LIVE remains **fail-closed** (GLOBAL_TRADING_HALT stays true). Full suite: **1050 tests passing** (Phase 8 added 75 tests over the 975-test Phase-7 baseline). Phase 9 (Execution) is **not** started.
+
+Schema: `migrations/versions/20260819_oms.py` adds `orders.orchestration_id` (unique), `order_identity_key` (unique), `correlation_id`, `strategy_id`, `strategy_version`, `risk_approval_id` (unique), `approval_expires_at` + indexes. A pre-existing model bug (missing `Index` import in `trading.py`) was fixed so the `orders` model imports cleanly.
+
+---
+
+## 0i. Phase 9 - Execution Engine (COMPLETE)
+
+Phase 9 was implemented and verified on 2026-08-20 (see `P9-session-report.md` and `review.md`). The Execution Engine - the provider-neutral boundary between the Phase-8 OMS and the future Phase-10 broker adapters - is now **TESTED** (implemented + unit-tested + integration-tested + 4-axis-adversarial-review-fixed).
+
+It consumes the OMS `ExecutionPort`, validates + dispatches the OMS-approved order to a provider-neutral `ExecutionAdapter` (no broker SDKs - Phase 10 owns those), and manages the execution lifecycle:
+
+- **Deterministic execution identity** - `compute_execution_id` (SHA-256 over `order_id` + `order_identity_key`) + `compute_attempt_id` (`execution_id-a{n}`), dedup across retries/restarts.
+- **Submission state machine** - `SUBMISSION_REQUESTED → SUBMISSION_IN_PROGRESS → SUBMITTED → ACKNOWLEDGED`, with `TIMEOUT`/`UNKNOWN`/`REJECTED`/`CANCELLED` branches.
+- **Exactly-once intent** - idempotent submission via `(execution_id, attempt_number)` unique constraint + re-read-on-conflict; concurrent duplicate submissions produce exactly one adapter dispatch.
+- **Timeout → UNKNOWN (never blind retry)** - a timeout is ambiguous (the provider may have accepted); bounded classification-based retry only for `TRANSIENT_FAILURE`.
+- **Cancellation lifecycle** - authoritative `CANCELLED` only on explicit confirmation; pending/ambiguous cancellation preserves `UNKNOWN`.
+- **Event normalization/dedup** - `compute_event_identity` + content-hash conflict detection; partial-fill accumulation with overfill protection; exact-quantity final fill.
+- **PostgreSQL persistence** - `ExecutionAttemptRecord` (`execution_attempts`) + Alembic migration `20260819_execution.py` (down_revision `20260819_oms`).
+- **Failure classification** - `FailureClass` enum (TIMEOUT / TRANSIENT_FAILURE / AUTH_FAILURE / UNKNOWN_EXTERNAL_STATE / INTERNAL_FAILURE) + `classify()`.
+- **Security** - LIVE blocked fail-closed, forged events rejected, no credentials/broker coupling anywhere in the engine.
+
+Full suite: **1117 tests passing** (Phase 9 added 67 tests over the 1050-test Phase-8 baseline). LIVE remains **fail-closed**. Phase 10 (Broker Adapters) is **not** started.
+
+Schema: `migrations/versions/20260819_execution.py` adds `execution_attempts` (unique on `execution_id` + `attempt_number`, indexed on `order_id`).
+
+---
+
 ## 1. Current Product Maturity Level
 
 **LEVEL 1 — FOUNDATION.**
@@ -295,32 +329,34 @@ Columns: `Capability | Current Status | Target Phase | Owner/Module | Dependenci
 | Order lifecycle state machine (11 states) | PRODUCTION | 8 | `execution_engine/lifecycle.py` | — | transitions enforced |
 | Intent (INTENT_CREATED) | PRODUCTION | 8 | `lifecycle.py` + `submission.py` | StrategySignal | initial state + approval id |
 | Order creation | PRODUCTION | 8 | `lifecycle.py` | — | legal transition |
-| Order validation | PARTIAL | 8 | `events.py` + `submission.py` + contracts | — | quantity/event/guard checks |
-| Idempotency | PARTIAL | 8 | `paper_trading/book.py` (uuid5) | — | same (account, client_order_id) → same id |
-| Submission (SUBMISSION_REQUESTED) | PARTIAL | 8 | `submission.py` (BrokerSubmissionGuard) | APPROVED RiskDecision | guard enforced |
+| Order validation | TESTED | 8 | `services/oms/validation.py` | intent/spec | quantity/action/type/account/mode/halt checks |
+| Idempotency | TESTED | 8 | `services/oms/identity.py` + `repository.py` | unique `order_identity_key` | replay → duplicate; conflict → CONFLICT |
+| Submission (SUBMISSION_REQUESTED) | TESTED | 8 | `services/oms/service.py` + `boundary.py` | re-validated approval | guard enforced; stops at Execution Port |
 | Acknowledgment (BROKER_ACKNOWLEDGED) | PRODUCTION | 8 | `events.py` | broker ACK | transition driven |
 | Partial fills (PARTIALLY_FILLED) | PRODUCTION | 8 | `events.py` (`_apply_partial_fill`) | PARTIAL_FILL event | accumulation + overfill guard |
 | Fills (FILLED) | PRODUCTION | 8 | `events.py` (`_apply_fill`) | FILL event | exact quantity required |
 | Rejection (REJECTED) | PRODUCTION | 8 | `events.py` | REJECTED event | transition |
-| Cancel request (CANCEL_REQUESTED) | PARTIAL | 8 | `lifecycle.py` + `events.py` | broker cancel support | transition exists; no broker implements |
+| Cancel request (CANCEL_REQUESTED) | TESTED | 8 | `services/oms/service.py` | broker cancel support (Phase 9) | internal request; distinct from CANCELLED |
 | Cancellation confirmation (CANCELLED) | PARTIAL | 8 | `lifecycle.py` + `events.py` | broker confirm | defined; unreachable end-to-end |
 | Unknown state (UNKNOWN) | PRODUCTION | 8 | `events.py` + `lifecycle.py` | UNKNOWN event | UNKNOWN→RECONCILIATION_REQUIRED |
 | Reconciliation-required | PARTIAL | 8 | `lifecycle.py` | reconciliation engine | state defined; no engine consumes |
 | Traceable transition events | PRODUCTION | 8 | `lifecycle.py` (OrderStateTransition) | `order_events` table | append-only transitions |
 
-### 5.9 Execution (Phase 9)
+### 5.9 Execution (Phase 9 — COMPLETE)
 
 | Capability | Current Status | Target Phase | Owner/Module | Dependencies | Verification Requirement |
 |---|---|---|---|---|---|
-| Execution dispatch | MISSING | 9 | (no dispatch loop) | broker adapter + guard | send intent to concrete adapter |
-| Execution timeout | MISSING | 9 | (none) | submission→ack clock | time out pending submission |
-| Execution cancellation | PARTIAL | 9 | `execution_engine/` + paper broker | broker cancel_order | lifecycle supports; broker raises |
-| Safe retry | MISSING | 9 | (none) | idempotency + bounded retry | no double-fill on retry |
-| Broker response handling | PARTIAL | 9 | `paper_trading/book.py` | BrokerOrderResponse | paper maps; generic handler absent |
-| Partial fills (execution) | PRODUCTION | 9 | `events.py` | PARTIAL_FILL event | transitions + overfill guard |
-| Duplicate protection (execution) | PARTIAL | 9 | `paper_trading/book.py` + risk rule | client_order_id idempotency | paper dedups; engine-level absent |
-| Execution event processing | PRODUCTION | 9 | `events.py` (apply_event) | BrokerOrderEvent (8 types) | all 8 types drive transitions |
-| Reconciliation triggers | PARTIAL | 9 | `lifecycle.py` (requires_reconciliation) | reconciliation engine | flags exist; no consumer |
+| Execution dispatch | TESTED | 9 | `services/execution_engine/.../engine.py` | `ExecutionAdapter` + guard | send intent to concrete adapter (no broker SDK) |
+| Execution timeout | TESTED | 9 | `engine.py` | submission→ack clock | timeout → UNKNOWN (never blind retry) |
+| Execution cancellation | TESTED | 9 | `engine.py` + `adapter.py` | authoritative cancel confirm | CANCELLED only on confirmation; ambiguous → UNKNOWN |
+| Safe retry | TESTED | 9 | `engine.py` + `errors.py` | idempotency + bounded retry | no double-fill; TRANSIENT_FAILURE-only retry |
+| Broker response handling | TESTED | 9 | `engine.py` (`_process_response`) | `ExecutionResponse` | status → outcome/order-state mapping |
+| Partial fills (execution) | PRODUCTION | 9 | `events.py` | PARTIAL_FILL event | transitions + overfill guard (accumulation via `apply_event`) |
+| Duplicate protection (execution) | TESTED | 9 | `engine.py` + `repository.py` | `execution_id` + attempt unique | idempotent submission + event dedup/conflict |
+| Execution event processing | PRODUCTION | 9 | `events.py` (`apply_event`) | BrokerOrderEvent | all types drive transitions |
+| Reconciliation triggers | PARTIAL | 9 | `lifecycle.py` | reconciliation engine | flags exist; no consumer (Phase 14) |
+
+> Phase 9 capabilities are marked **TESTED** (implemented + unit-tested + integration-tested + 4-axis-review-fixed). Concrete broker adapters are deferred to Phase 10; the engine ends at a provider-neutral `ExecutionAdapter` boundary with a deterministic TEST adapter. Live PostgreSQL connectivity remains deferred (in-memory execution store mirrors the transactional + unique-constraint semantics).
 
 ### 5.10 Broker Integration (Phase 10)
 
@@ -386,7 +422,7 @@ Columns: `Capability | Current Status | Target Phase | Owner/Module | Dependenci
 
 - **Total capabilities tracked:** ~153 (Foundation 12 · Database 11 · Market Data 13 · Strategy 11 · Signal 11 · Risk 28 · Orchestrator 13 · OMS 15 · Execution 9 · Broker 3 · Position/Portfolio/P&L/Reconciliation 4 · Simulation 2 · Platform 12 · Operations/Live 9).
 - **PRODUCTION today:** deterministic backtesting; migration scripts; secure-error envelope; core market-data contracts + dedup/staleness helpers; signal/strategy contracts + versioning + runtime isolation; 20 risk rule classes (14 core + 6 configurable) + fail-closed defaults; 11-state order lifecycle + event engine.
-- **MISSING today (highest-impact):** execution dispatch/timeout/retry, concrete brokers, portfolio/P&L/reconciliation engines, web/mobile/desktop, tracing/alerts/CI, and all LIVE release paths. (Phase 1 auth/RBAC/CORS/rate-limit + ASGI/psycopg, Phase 2 DB runtime, Phase 3 market-data runtime, Phase 4 strategy runtime, Phase 5 signal engine, Phase 6 live risk engine, and Phase 7 trading orchestrator are now **TESTED**.)
+- **MISSING today (highest-impact):** concrete brokers, portfolio/P&L/reconciliation engines, web/mobile/desktop, tracing/alerts/CI, and all LIVE release paths. (Phase 1 auth/RBAC/CORS/rate-limit + ASGI/psycopg, Phase 2 DB runtime, Phase 3 market-data runtime, Phase 4 strategy runtime, Phase 5 signal engine, Phase 6 live risk engine, Phase 7 trading orchestrator, Phase 8 OMS, and Phase 9 execution engine are now **TESTED**.)
 
 ---
 

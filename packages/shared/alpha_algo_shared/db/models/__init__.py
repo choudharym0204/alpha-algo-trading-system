@@ -3,6 +3,7 @@ from .market_data import Candle, IndicatorValue, MarketDepth, Tick
 from .reference import BrokerAccount, BrokerSession, Exchange, Instrument
 from .safety import Alert, AuditLog, Notification, OrderEvent, PortfolioSnapshot, PositionEvent, RiskEvent, RiskRule, SystemEvent
 from .trading import Order, Position, Signal, Strategy, StrategyConfig, StrategyRun, StrategyVersion, Trade, TradingIntentRecord
+from .execution import ExecutionAttemptRecord
 
 __all__ = [
     "Permission",
@@ -23,6 +24,7 @@ __all__ = [
     "Trade",
     "Position",
     "TradingIntentRecord",
+    "ExecutionAttemptRecord",
     "RiskRule",
     "RiskEvent",
     "OrderEvent",
