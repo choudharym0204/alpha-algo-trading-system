@@ -1,3 +1,9 @@
+from alpha_algo_contracts.events import (
+    DomainEvent,
+    DomainEventError,
+    EventType,
+    create_event,
+)
 from alpha_algo_contracts.market_data import CandleTimeframe, MarketCandle, MarketTick
 from alpha_algo_contracts.risk import (
     RiskAssessmentRequest,
@@ -8,6 +14,9 @@ from alpha_algo_contracts.signals import SignalAction, StrategySignal, StrategyV
 
 __all__ = [
     "CandleTimeframe",
+    "DomainEvent",
+    "DomainEventError",
+    "EventType",
     "MarketCandle",
     "MarketTick",
     "RiskAssessmentRequest",
@@ -16,4 +25,5 @@ __all__ = [
     "SignalAction",
     "StrategySignal",
     "StrategyVersion",
+    "create_event",
 ]

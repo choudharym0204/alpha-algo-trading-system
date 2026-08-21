@@ -10,6 +10,7 @@ from fastapi import Request, Response
 from alpha_algo_api.config import get_settings
 from alpha_algo_api.errors import build_error_response
 from alpha_algo_api.middleware import resolve_request_id
+from alpha_algo_api.observability import record_rate_limit_event
 
 
 class SlidingWindowRateLimiter:
@@ -99,6 +100,7 @@ async def rate_limit_middleware(
         request.state.request_id = request_id
 
     if not _get_limiter().allow(_client_key(request)):
+        record_rate_limit_event()
         return build_error_response(
             code="RATE_LIMITED",
             message="Rate limit exceeded. Retry later.",

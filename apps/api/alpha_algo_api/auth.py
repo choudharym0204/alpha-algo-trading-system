@@ -15,7 +15,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from alpha_algo_api.config import get_settings
 from alpha_algo_api.errors import ApiError
+from alpha_algo_api.observability import record_auth_failure
 from alpha_algo_api.security.tokens import TokenError, create_token, decode_token
+from alpha_algo_observability import FailureClass
 
 security = HTTPBearer(auto_error=False)
 
@@ -86,12 +88,14 @@ def issue_refresh_token(
 
 def authenticate(credentials: HTTPAuthorizationCredentials | None) -> CurrentUser:
     if credentials is None:
+        record_auth_failure(FailureClass.AUTHENTICATION_FAILURE)
         raise ApiError(
             code="AUTH_REQUIRED",
             message="Authentication required.",
             status_code=401,
         )
     if credentials.scheme.lower() != "bearer":
+        record_auth_failure(FailureClass.AUTHENTICATION_FAILURE)
         raise ApiError(
             code="AUTH_INVALID",
             message="Unsupported authentication scheme.",
@@ -108,6 +112,7 @@ def authenticate(credentials: HTTPAuthorizationCredentials | None) -> CurrentUse
             expected_type="access",
         )
     except TokenError as exc:
+        record_auth_failure(FailureClass.AUTHENTICATION_FAILURE)
         raise ApiError(
             code="AUTH_INVALID",
             message="Invalid or expired authentication token.",
@@ -139,6 +144,7 @@ def require_permission(permission: str):
         user: Annotated[CurrentUser, Depends(require_user)],
     ) -> CurrentUser:
         if not user.has_permission(permission):
+            record_auth_failure(FailureClass.AUTHORIZATION_FAILURE)
             raise ApiError(
                 code="FORBIDDEN",
                 message="Required permission is missing.",

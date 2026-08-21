@@ -4,6 +4,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from alpha_algo_api.auth import Permissions, authenticate_token
 from alpha_algo_api.errors import ApiError
+from alpha_algo_api.observability import record_ws_connect, record_ws_disconnect
 
 router = APIRouter(tags=["websocket"])
 
@@ -24,20 +25,24 @@ async def websocket_gateway(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
-    await websocket.send_json(
-        {
-            "type": "HEALTH_UPDATE",
-            "payload": {
-                "service": "alpha-algo-api",
-                "status": "connected",
-                "live_trading": "disabled",
-            },
-        }
-    )
-
+    record_ws_connect()
     try:
-        await websocket.receive_text()
-    except WebSocketDisconnect:
-        return
-    await websocket.close(code=1000)
+        await websocket.send_json(
+            {
+                "type": "HEALTH_UPDATE",
+                "payload": {
+                    "service": "alpha-algo-api",
+                    "status": "connected",
+                    "live_trading": "disabled",
+                },
+            }
+        )
+
+        try:
+            await websocket.receive_text()
+        except WebSocketDisconnect:
+            return
+        await websocket.close(code=1000)
+    finally:
+        record_ws_disconnect()
 

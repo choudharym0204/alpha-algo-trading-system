@@ -1,0 +1,32 @@
+name: alpha_algo_mobile
+description: Alpha Algo Trading System — Mobile Trading Terminal (Phase 18)
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # State management + DI (battle-tested, minimal, no duplicate systems)
+  provider: ^6.1.1
+  # Typed REST client
+  http: ^1.2.1
+  # Platform-secure token storage (Android Keystore / iOS Keychain backed)
+  flutter_secure_storage: ^9.0.0
+  # Authenticated WebSocket
+  web_socket_channel: ^2.4.0
+  # Date/number formatting for financial values
+  intl: ^0.19.0
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

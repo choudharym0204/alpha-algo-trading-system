@@ -24,18 +24,38 @@ from alpha_algo_api.errors import (
 )
 from alpha_algo_api.logging import configure_logging
 from alpha_algo_api.middleware import request_context_middleware
+from alpha_algo_api.observability import register_trading_safety_health
 from alpha_algo_api.rate_limit import rate_limit_middleware
 from alpha_algo_api.routes.auth import router as auth_router
+from alpha_algo_api.routes.observability import router as observability_router
 from alpha_algo_api.routes.system import router as system_router
 from alpha_algo_api.routes.ws import router as ws_router
+from alpha_algo_observability import DependencyStatus, HealthStatus, get_health_registry
 
 logger = logging.getLogger(__name__)
+
+
+def _database_health_check() -> DependencyStatus:
+    from alpha_algo_api.db import ping_database
+
+    ok = ping_database()
+    return DependencyStatus(
+        name="database",
+        status=HealthStatus.OK if ok else HealthStatus.UNAVAILABLE,
+        optional=False,
+        detail="" if ok else "database unreachable",
+    )
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     configure_logging()
     settings = get_settings()
+    register_trading_safety_health(
+        live_enabled=settings.live_trading_enabled,
+        global_halt=settings.global_trading_halt,
+    )
+    get_health_registry().register("database", _database_health_check)
     if settings.db_startup_check_enabled:
         try:
             verify_database_ready()
@@ -80,6 +100,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(system_router)
+    app.include_router(observability_router)
     app.include_router(ws_router)
     return app
 
