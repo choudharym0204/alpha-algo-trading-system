@@ -132,7 +132,7 @@ def test_submission_recheck_rejects_expired_approval():
     expired = replace(
         spec, approval_expires_at=datetime.now(UTC) - timedelta(seconds=1)
     )
-    identity = build_order_identity(intent, internal_order_id=uuid4(), quantity=spec.quantity)
+    _ = build_order_identity(intent, internal_order_id=uuid4(), quantity=spec.quantity)
     lifecycle = OrderLifecycle(order_id=uuid4()).transition_to(
         OrderState.INTERNAL_ORDER_CREATED, occurred_at=datetime.now(UTC), reason="x"
     )

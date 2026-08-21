@@ -13,7 +13,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import datetime
-from typing import TypeVar
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -24,9 +23,6 @@ from alpha_algo_contracts import StrategySignal
 from alpha_algo_shared.db.models import Signal
 from alpha_algo_signal_engine.identity import (
     code_hash_from,
-    compute_signal_content_hash,
-    compute_signal_identity_key,
-    event_timestamp,
     run_id_from,
 )
 

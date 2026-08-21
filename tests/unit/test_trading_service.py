@@ -2,11 +2,9 @@
 
 from decimal import Decimal
 
-import pytest
 
 from alpha_algo_contracts import SignalAction
 from alpha_algo_risk_engine.approval import compute_risk_identity_key
-from alpha_algo_signal_engine.identity import compute_signal_identity_key
 from alpha_algo_signal_engine.state import SignalState
 from alpha_algo_trading_engine.identity import compute_orchestration_identity_key
 from alpha_algo_trading_engine.state import OrchestrationState

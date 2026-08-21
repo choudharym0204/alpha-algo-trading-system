@@ -42,7 +42,7 @@ def test_two_accounts_have_isolated_funds() -> None:
 
 
 def test_two_runs_isolate_order_identity() -> None:
-    inst = uuid4()
+    _ = uuid4()
     run_a = uuid4()
     run_b = uuid4()
     a1 = make_account(paper_run_id=run_a)

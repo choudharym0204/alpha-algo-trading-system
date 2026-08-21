@@ -285,7 +285,27 @@ Phase 21 was **implemented and TESTED** on 2026-08-21 (see `P21-session-report.m
 
 **Verification (real evidence):** event-architecture unit tests (18) + pipeline event-flow integration tests (3) → **21 new tests**; full backend regression → **1669 passed** (1648 baseline, zero regressions). The integration test drives the full pipeline (signal → risk → orchestration → OMS → execution → position → P&L → reconciliation) as a causally-linked, correlated event stream and verifies ordering, causation, correlation, and domain-id reconstruction. LIVE remains **fail-closed**; events are append-only facts and can never enable LIVE or modify trading state.
 
-**Status:** Phase 21 is **TESTED** — envelope + bus implemented and tested, correlation/causation verified, secrets rejected, regression green. Phase 22 is **not** started.
+**Status:** Phase 21 is **TESTED** — envelope + bus implemented and tested, correlation/causation verified, secrets rejected, regression green.
+
+---
+
+## 0v. Phase 22 - CI/CD (IMPLEMENTED — VERIFICATION DEFERRED; all local gates green)
+
+Phase 22 was **implemented** on 2026-08-21 (see `P22-session-report.md`, `P22-review.md`, `docs/ci-cd.md`). A 7-job GitHub Actions workflow (`.github/workflows/ci.yml`: `lint`, `test`, `security`, `migration-check`, `web-build`, `mobile-build`, `desktop-build`) was added with caching, plus `requirements-dev.txt`, a portable `scripts/security_scan.py` (secrets/broker-placeholder/LIVE-fail-closed), an offline `scripts/check_migrations.py` (single head/base/linear/no-orphans + offline SQL), and `scripts/run_ci.py` (local runner). `ruff` was introduced (`F`,`E9`) and **115 real pyflakes findings were fixed** (unused imports/redefinitions/unused-vars + a Phase-20 `AlertIdentity` `__all__` bug), with the full regression confirming zero behavior change. Web gained a `typecheck` (`tsc --noEmit`) script.
+
+**Verification (local executable evidence):** backend regression **1669 passed**; `ruff` 0; migration check 15 revisions single-head/single-base + offline SQL OK; security scan clean; web typecheck + 29 tests + production build green; mobile `flutter analyze` 0 + 23 tests; desktop `flutter analyze` 0 + 29 tests; `ci.yml` YAML parses (7 jobs). **Deferred (cannot execute in this environment):** remote GitHub Actions execution and Docker-based jobs (no runner/Docker locally); `flutter build apk`/`flutter build windows` re-run (cited from Phases 18/19, code unchanged); iOS/macOS. Per spec §19, final status is **IMPLEMENTED — VERIFICATION DEFERRED** (not upgraded on YAML inspection alone). LIVE remains **fail-closed**; no job enables LIVE or deploys credentials.
+
+**Status:** Phase 22 is **IMPLEMENTED — VERIFICATION DEFERRED**. Phase 23 is **not** started.
+
+---
+
+## 0w. Phase 23 - Full System Verification (TESTED — kill switch + verified safety controls)
+
+Phase 23 was **implemented and TESTED** on 2026-08-21 (see `P23-session-report.md`, `P23-review.md`, `docs/system-verification.md`). "Full system verification" closed the last LIVE-readiness safety-control gap and verified the full fail-closed chain. The single implementation gap was the **kill switch**: added `GlobalHaltController` (`services/risk_engine/alpha_algo_risk_engine/gates.py`) — a fail-closed, immutable, thread-safe controller with `activate(reason, actor)` / `deactivate(reason, actor)` / `is_halted()` (starts **halted**; deactivate requires explicit reason + actor). Enforcement is unchanged and already fail-closed (`GlobalHaltRule` first in the engine rejects everything while halted; `LiveModeRule` blocks LIVE unless explicitly enabled). The 17 LIVE safety gates (`LiveSafetyGateEvaluator`) and the circuit breaker (`CircuitBreaker`/`CircuitBreakerRegistry`, already wired into the risk service) were **verified** (their §5.14 statuses were stale PARTIAL/MISSING, not code gaps).
+
+**Verification (real evidence):** 10 kill-switch unit tests + 4 full-system integration tests (halts instantly, lifts cleanly, gates-green-does-not-enable-LIVE, breaker trips+resets, single authoritative halt source) → **14 new tests**; full backend regression → **1683 passed** (1669 baseline, zero regressions); `ruff` clean; security scan clean. LIVE remains **fail-closed** (`LIVE_TRADING_ENABLED=false`, `GLOBAL_TRADING_HALT=true`); gates-green + halt-lifted still cannot enable LIVE. Phase 24 is **not** started.
+
+**Status:** Phase 23 is **TESTED**. Phase 24 is **not** started.
 
 ---
 
@@ -631,10 +651,10 @@ Columns: `Capability | Current Status | Target Phase | Owner/Module | Dependenci
 | Event architecture - broker | MISSING | 21 | - | scale justification | broker only if justified (deferred) |
 | CI/CD - format/lint/type | MISSING | 22 | `.github/workflows/ci.yml` | ruff/black/mypy | CI runs checks |
 | CI/CD - test/security/build/migration | PARTIAL | 22 | `.github/workflows/ci.yml` | test matrix + Docker | CI full pipeline |
-| Live release - safety gates (24+) | PARTIAL | 23 | `gates.py` (17/17 TODO) | all engines + controls | all gates verified |
+| Live release - safety gates (24+) | TESTED | 23 | `gates.py` (`LiveSafetyGateEvaluator` + 17 gates) | all engines + controls | all gates verified (evaluator + tests) |
 | Live release - SHADOW→FULL | MISSING | 24 | - | Phase 23 + ops | controlled progression |
-| Kill switch | PARTIAL | 23 | `gates.py` (GlobalHaltState) | live orchestration | halts live instantly |
-| Circuit breaker (actual) | MISSING | 23 | `gates.py` (flag only) | live wiring | trips + resets |
+| Kill switch | TESTED | 23 | `gates.py` (`GlobalHaltController`) | live orchestration | halts live instantly (activate/is_halted) |
+| Circuit breaker (actual) | TESTED | 23 | `circuit_breaker.py` (`CircuitBreaker`/`Registry`, wired into risk service) | live wiring | trips + resets |
 
 ---
 

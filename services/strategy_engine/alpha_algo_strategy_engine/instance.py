@@ -5,11 +5,10 @@ contracts."""
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from threading import Lock
 from time import perf_counter
 from typing import Callable
-from uuid import UUID
 
 from alpha_algo_contracts import MarketCandle, MarketTick, StrategySignal
 from alpha_algo_strategy_engine.config import StrategyConfig

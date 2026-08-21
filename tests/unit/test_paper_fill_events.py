@@ -25,7 +25,6 @@ from alpha_algo_broker_adapters import (
 )
 from alpha_algo_contracts import RiskDecision, RiskDecisionResult
 from alpha_algo_execution_engine import (
-    BrokerOrderEvent,
     BrokerSubmissionGuard,
     InvalidOrderTransition,
     OrderEventType,

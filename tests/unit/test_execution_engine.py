@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from alpha_algo_execution_engine.adapter import (
-    ExecutionCapabilities,
     ExecutionResponse,
     InMemoryAdapter,
 )

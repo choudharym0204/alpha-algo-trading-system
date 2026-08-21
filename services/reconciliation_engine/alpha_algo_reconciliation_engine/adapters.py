@@ -7,7 +7,6 @@ parsing stays in the broker adapter; reconciliation consumes only these types.
 
 from __future__ import annotations
 
-from decimal import Decimal
 
 from alpha_algo_reconciliation_engine.contracts import (
     FundsObservation,

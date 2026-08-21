@@ -6,7 +6,6 @@ import pytest
 
 from alpha_algo_broker_integration.contracts import (
     BrokerName,
-    UniversalOrderType,
     UniversalProductType,
 )
 from alpha_algo_broker_integration.errors import BrokerError, BrokerErrorClass

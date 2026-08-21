@@ -22,7 +22,6 @@ __all__ = [
     "AlertSeverity",
     "AlertState",
     "Alert",
-    "AlertIdentity",
     "AlertManager",
     "NoopAlertManager",
     "get_alert_manager",

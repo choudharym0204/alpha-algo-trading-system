@@ -20,7 +20,6 @@ from uuid import uuid4
 import pytest
 
 from alpha_algo_strategy_engine import (
-    ConfigValidationError,
     StrategyInstance,
     StrategyRuntime,
     TradingMode,

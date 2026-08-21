@@ -1,8 +1,6 @@
 """Phase 9 — timeout semantics + retry classification tests."""
 
-from datetime import UTC, datetime
 
-import pytest
 
 from alpha_algo_execution_engine.adapter import InMemoryAdapter
 from alpha_algo_execution_engine.engine import ExecutionEngine

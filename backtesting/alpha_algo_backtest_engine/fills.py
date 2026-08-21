@@ -186,13 +186,12 @@ def evaluate_fill(
                 intent.side is IntentSide.SELL and intent.limit_price > open_price
             ):
                 return _unfilled(intent_index, UnfilledReason.LIMIT_NOT_EXECUTABLE.value, cash, position)
-        anchor, kind = open_price, "open"
+        anchor, _ = open_price, "open"
     elif intent.order_type is IntentType.LIMIT:
         if intent.side is IntentSide.BUY:
             if record.ask is None:
                 return _unfilled(intent_index, UnfilledReason.NO_EXECUTABLE_ASK.value, cash, position)
             anchor = _require_decimal(record.ask, "tick ask")
-            kind = "ask"
             if intent.limit_price is None:
                 raise BacktestEngineError("limit intents require a limit_price")
             if intent.limit_price < anchor:
@@ -201,7 +200,6 @@ def evaluate_fill(
             if record.bid is None:
                 return _unfilled(intent_index, UnfilledReason.NO_EXECUTABLE_BID.value, cash, position)
             anchor = _require_decimal(record.bid, "tick bid")
-            kind = "bid"
             if intent.limit_price is None:
                 raise BacktestEngineError("limit intents require a limit_price")
             if intent.limit_price > anchor:
@@ -209,14 +207,14 @@ def evaluate_fill(
     else:  # MARKET on ticks
         if intent.side is IntentSide.BUY:
             if record.ask is not None:
-                anchor, kind = _require_decimal(record.ask, "tick ask"), "ask"
+                anchor, _ = _require_decimal(record.ask, "tick ask"), "ask"
             else:
-                anchor, kind = _require_decimal(record.ltp, "tick ltp"), "ltp"
+                anchor, _ = _require_decimal(record.ltp, "tick ltp"), "ltp"
         else:
             if record.bid is not None:
-                anchor, kind = _require_decimal(record.bid, "tick bid"), "bid"
+                anchor, _ = _require_decimal(record.bid, "tick bid"), "bid"
             else:
-                anchor, kind = _require_decimal(record.ltp, "tick ltp"), "ltp"
+                anchor, _ = _require_decimal(record.ltp, "tick ltp"), "ltp"
 
     # A non-positive anchor is nonsense data on every path (candle open, tick
     # ask/bid, ltp fallback). Reject it loudly — model_construct smuggling of

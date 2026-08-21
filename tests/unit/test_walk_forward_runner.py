@@ -113,7 +113,7 @@ class TestRunnerContract:
         inputs = demo_input()
         expected = build_windows(inputs=inputs, config=DEMO_CONFIG)
         captured: list = []
-        result = run_walk_forward(
+        _ = run_walk_forward(
             inputs=inputs,
             config=DEMO_CONFIG,
             window_runner=lambda window: (

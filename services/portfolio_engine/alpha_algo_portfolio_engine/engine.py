@@ -14,7 +14,6 @@ portfolio, never fabricated zeros.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from time import perf_counter
 from typing import Callable, Protocol
 from uuid import UUID
@@ -22,7 +21,6 @@ from uuid import UUID
 from alpha_algo_portfolio_engine.aggregation import compute_portfolio
 from alpha_algo_portfolio_engine.contracts import (
     PortfolioComputation,
-    PortfolioIdentity,
     PortfolioInputs,
     PortfolioResult,
     PortfolioSnapshot,
@@ -35,7 +33,6 @@ from alpha_algo_portfolio_engine.errors import (
     PortfolioValidationError,
 )
 from alpha_algo_portfolio_engine.identity import (
-    build_portfolio_identity,
     snapshot_content_hash,
 )
 from alpha_algo_portfolio_engine.metrics import PortfolioMetrics

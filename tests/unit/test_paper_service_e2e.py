@@ -4,7 +4,7 @@ import asyncio
 from decimal import Decimal
 from uuid import uuid4
 
-from alpha_algo_broker_adapters import OrderSide, OrderType
+from alpha_algo_broker_adapters import OrderSide
 from alpha_algo_broker_integration.contracts import BrokerFundsSnapshot
 from alpha_algo_paper_trading import PaperBrokerAdapter
 from alpha_algo_paper_runtime import PaperTradingService

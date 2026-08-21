@@ -7,7 +7,6 @@ upstream contract types; they never call a broker and never parse broker payload
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 
 from alpha_algo_portfolio_engine.contracts import FundsState, PositionInput
 

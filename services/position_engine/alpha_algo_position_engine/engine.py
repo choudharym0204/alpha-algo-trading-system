@@ -40,7 +40,6 @@ from alpha_algo_position_engine.contracts import (
 from alpha_algo_position_engine.errors import (
     DuplicateApplyError,
     PositionConflictError,
-    PositionError,
     PositionIdentityError,
     PositionModeError,
     PositionOverCloseError,

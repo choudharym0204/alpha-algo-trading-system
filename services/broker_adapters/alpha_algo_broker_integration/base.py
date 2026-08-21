@@ -18,7 +18,6 @@ from typing import Callable
 from alpha_algo_broker_integration.connection import (
     ConnectionStateMachine,
     ReconnectPolicy,
-    is_recoverable,
 )
 from alpha_algo_broker_integration.contracts import (
     BrokerAdapter,
@@ -29,7 +28,6 @@ from alpha_algo_broker_integration.contracts import (
     BrokerHoldingSnapshot,
     BrokerOrderRequest,
     BrokerOrderResponse,
-    BrokerOrderStatus,
     BrokerPositionSnapshot,
     BrokerSessionState,
     ConnectionState,

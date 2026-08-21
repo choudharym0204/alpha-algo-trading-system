@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Callable
-from uuid import UUID
 
 from alpha_algo_contracts import SignalAction, StrategySignal
 from alpha_algo_signal_engine.directory import StrategyDirectory

@@ -15,7 +15,6 @@ from alpha_algo_reconciliation_engine.errors import (
 
 from reconciliation_test_support import (
     InMemoryReconciliationRepository,
-    make_position_obs,
 )
 
 _PACKAGE_DIR = Path(__file__).resolve().parents[2] / "services" / "reconciliation_engine" / "alpha_algo_reconciliation_engine"

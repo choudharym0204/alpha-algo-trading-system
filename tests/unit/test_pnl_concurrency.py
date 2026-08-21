@@ -78,7 +78,7 @@ def test_restart_replay_reconstructs_realized_total():
     )
 
     # "After restart": fresh engine over the same durable repository.
-    engine_b = make_engine(repo)
+    _ = make_engine(repo)
     events = repo.list_events(account_id=acc)
     assert len(events) == 2
     total = sum((e.net_pnl for e in events), Decimal("0"))

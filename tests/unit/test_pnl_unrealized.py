@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from uuid import uuid4
 
 from alpha_algo_pnl_engine.contracts import PnlStatus, PriceState
 from alpha_algo_pnl_engine.engine import PnlEngine

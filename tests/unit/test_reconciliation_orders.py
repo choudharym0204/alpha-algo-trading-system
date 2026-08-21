@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from alpha_algo_reconciliation_engine.contracts import DiscrepancyKind, EntityType
+from alpha_algo_reconciliation_engine.contracts import DiscrepancyKind
 from alpha_algo_reconciliation_engine.matching import MatchContext, reconcile_orders
 
 from reconciliation_test_support import make_order_obs

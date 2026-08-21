@@ -43,7 +43,6 @@ from alpha_algo_oms.errors import (
 from alpha_algo_oms.identity import OrderIdentity, build_order_identity
 from alpha_algo_oms.metrics import OmsMetrics
 from alpha_algo_oms.repository import (
-    OUTCOME_CREATED,
     OUTCOME_DUPLICATE,
     OrderRepository,
     to_orm_event,

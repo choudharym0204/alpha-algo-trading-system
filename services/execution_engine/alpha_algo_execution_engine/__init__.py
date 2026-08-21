@@ -37,10 +37,6 @@ from alpha_algo_execution_engine.events import (
     OrderEventType,
     OrderExecutionState,
 )
-from alpha_algo_execution_engine.identity import (
-    compute_attempt_id,
-    compute_execution_id,
-)
 from alpha_algo_execution_engine.lifecycle import (
     InvalidOrderTransition,
     OrderLifecycle,

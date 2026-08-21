@@ -11,9 +11,7 @@ from alpha_algo_trading_engine.state import OrchestrationState
 from risk_test_support import FakeRiskProvider, FakeSessionFactory
 from trading_test_support import (
     FixedIntentResolver,
-    RecordingOmsPort,
     buy_intent,
-    make_buy_signal,
     make_orchestrator,
 )
 

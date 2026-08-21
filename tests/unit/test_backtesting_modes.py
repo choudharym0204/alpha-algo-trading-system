@@ -173,7 +173,6 @@ def test_replay_cursor_rejects_empty_records() -> None:
 
 
 def test_env_example_keeps_live_disabled() -> None:
-    import sys
     from pathlib import Path
 
     env_path = Path(__file__).resolve().parents[2] / ".env.example"

@@ -19,8 +19,6 @@ from alpha_algo_position_engine.engine import PositionEventData
 from alpha_algo_position_engine.errors import DuplicateApplyError, PositionPersistenceError
 from alpha_algo_position_engine.identity import fill_content_hash
 from alpha_algo_position_engine.repository import PositionRepository, to_state
-from alpha_algo_shared.db.models.safety import PositionEvent
-from alpha_algo_shared.db.models.trading import Position
 
 from position_test_support import InMemoryPositionRepository, make_fill
 
@@ -105,7 +103,7 @@ def test_new_event_row_carries_identity_and_hash():
 
 
 def test_inmemory_duplicate_apply_raises_unique_constraint():
-    from alpha_algo_position_engine.contracts import PositionIdentity, PositionState
+    from alpha_algo_position_engine.contracts import PositionState
     from alpha_algo_position_engine.identity import build_position_identity
 
     repo = InMemoryPositionRepository()
@@ -129,7 +127,7 @@ def test_inmemory_failure_rolls_back_without_mutation():
     repo = InMemoryPositionRepository()
     repo.fail_next_apply = True
     fill = make_fill(side="BUY", quantity="100", price="100")
-    from alpha_algo_position_engine.contracts import PositionIdentity, PositionState
+    from alpha_algo_position_engine.contracts import PositionState
     from alpha_algo_position_engine.identity import build_position_identity
 
     identity = build_position_identity(strategy_run_id=fill.strategy_run_id, instrument_id=fill.instrument_id, trading_mode=fill.trading_mode)

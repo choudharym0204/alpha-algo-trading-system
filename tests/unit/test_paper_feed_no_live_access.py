@@ -15,8 +15,6 @@ import sys
 from pathlib import Path
 
 from alpha_algo_paper_feed import (
-    TICK_REFERENCE_POLICY,
-    PaperFeedError,
     TickProvenance,
     provenance_of,
     tick_to_reference,

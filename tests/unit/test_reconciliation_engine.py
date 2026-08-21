@@ -8,7 +8,6 @@ import pytest
 
 from alpha_algo_reconciliation_engine.contracts import (
     DiscrepancyKind,
-    EntityType,
     ReconciliationInputs,
     ReconciliationScope,
     RunStatus,

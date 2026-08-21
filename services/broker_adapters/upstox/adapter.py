@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from alpha_algo_broker_integration.base import BaseBrokerAdapter
 from alpha_algo_broker_integration.contracts import (

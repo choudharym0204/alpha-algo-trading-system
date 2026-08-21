@@ -270,8 +270,8 @@ def test_alert_identity_is_deterministic():
 
 def test_audit_append_only_chaining():
     rec = InMemoryAuditRecorder()
-    e1 = rec.record("login", actor="u1", source="api", status="ok", fields={"ip": "1.2.3.4"})
-    e2 = rec.record("logout", actor="u1", source="api", status="ok")
+    _ = rec.record("login", actor="u1", source="api", status="ok", fields={"ip": "1.2.3.4"})
+    _ = rec.record("logout", actor="u1", source="api", status="ok")
     events = rec.events()
     assert len(events) == 2
     assert events[0]["previous_event_hash"] is None

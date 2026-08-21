@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from uuid import UUID
 
 from alpha_algo_contracts import RiskDecision, RiskDecisionResult, StrategySignal
 from alpha_algo_risk_engine.context import RiskOrderIntent

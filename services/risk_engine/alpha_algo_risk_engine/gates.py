@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -139,3 +140,70 @@ class LiveSafetyGateEvaluator:
             global_halt_active=False,
             metadata={"evaluated_source": snapshot.evaluated_source, **snapshot.metadata},
         )
+
+
+class GlobalHaltController:
+    """Kill switch — authoritative, fail-closed global trading halt (Phase 23).
+
+    Starts **ACTIVE** (halted). ``activate`` halts instantly with an auditable
+    reason and actor; ``deactivate`` lifts the halt only with an explicit reason
+    and actor (never silently). State is immutable and transitions are atomic, so
+    a concurrent risk/execution check always observes a consistent halt state.
+    """
+
+    def __init__(
+        self,
+        *,
+        clock: Callable[[], datetime] | None = None,
+        initial_active: bool = True,
+        initial_reason: str = "default safety halt",
+    ) -> None:
+        self._clock = clock or (lambda: datetime.now(tz=UTC))
+        self._lock = threading.Lock()
+        self._state = GlobalHaltState(
+            active=initial_active,
+            reason=initial_reason if initial_active else "",
+            updated_at=self._clock(),
+            updated_by="system",
+        )
+
+    @property
+    def state(self) -> GlobalHaltState:
+        with self._lock:
+            return self._state
+
+    def is_halted(self) -> bool:
+        """True when trading is halted (fail-closed default)."""
+        return self.state.active
+
+    def activate(self, *, reason: str, actor: str) -> GlobalHaltState:
+        """Trigger the kill switch: halt all trading instantly."""
+        self._require_reason_and_actor(reason, actor)
+        with self._lock:
+            self._state = GlobalHaltState(
+                active=True,
+                reason=reason,
+                updated_at=self._clock(),
+                updated_by=actor,
+            )
+            return self._state
+
+    def deactivate(self, *, reason: str, actor: str) -> GlobalHaltState:
+        """Lift the halt — requires an explicit, audited reason and actor."""
+        self._require_reason_and_actor(reason, actor)
+        with self._lock:
+            self._state = GlobalHaltState(
+                active=False,
+                reason="",
+                updated_at=self._clock(),
+                updated_by=actor,
+                metadata={"deactivate_reason": reason},
+            )
+            return self._state
+
+    @staticmethod
+    def _require_reason_and_actor(reason: str, actor: str) -> None:
+        if not reason.strip():
+            raise ValueError("reason is required")
+        if not actor.strip():
+            raise ValueError("actor is required")

@@ -1,6 +1,5 @@
 """Phase 9 — execution security tests (LIVE blocked, forged events, no bypass)."""
 
-from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -9,7 +8,6 @@ from alpha_algo_execution_engine.adapter import InMemoryAdapter
 from alpha_algo_execution_engine.engine import ExecutionEngine
 from alpha_algo_execution_engine.errors import ExecutionValidationError
 from alpha_algo_execution_engine.events import OrderEventType
-from alpha_algo_execution_engine.lifecycle import OrderState
 
 from execution_test_support import InMemoryExecutionRepository, make_event, make_request
 

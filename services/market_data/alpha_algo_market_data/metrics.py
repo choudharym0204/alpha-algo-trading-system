@@ -7,7 +7,7 @@ tests. Redis/Prometheus wiring is intentionally out of scope (no premature infra
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 

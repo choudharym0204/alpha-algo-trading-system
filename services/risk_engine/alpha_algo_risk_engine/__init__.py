@@ -48,6 +48,7 @@ from alpha_algo_risk_engine.engine import (
     default_risk_rules,
 )
 from alpha_algo_risk_engine.gates import (
+    GlobalHaltController,
     GlobalHaltState,
     LiveSafetyGate,
     LiveSafetyGateDecision,
@@ -101,6 +102,7 @@ __all__ = [
     "ExecutionTimeoutRule",
     "RetrySafetyRule",
     # gates
+    "GlobalHaltController",
     "GlobalHaltState",
     "LiveSafetyGate",
     "LiveSafetyGateDecision",

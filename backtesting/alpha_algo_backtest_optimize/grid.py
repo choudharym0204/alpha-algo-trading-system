@@ -16,7 +16,7 @@ optimizer never sees, and never mixes, the two. No parallel execution is used
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from itertools import product
 from typing import Callable

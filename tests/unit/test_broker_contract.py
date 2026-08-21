@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from alpha_algo_broker_integration.contracts import (
-    BrokerCapabilities,
     BrokerName,
     ConnectionState,
     TradingMode,

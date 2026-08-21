@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from alpha_algo_broker_adapters import BrokerCredentialsRef, OrderSide, OrderType, TradingMode
+from alpha_algo_broker_adapters import BrokerCredentialsRef, TradingMode
 from alpha_algo_paper_trading import PaperBrokerAdapter, PaperReferencePrice
 from alpha_algo_paper_runtime import (
     PaperAccount,

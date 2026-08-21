@@ -68,7 +68,6 @@ class TestLatencyModel:
 class TestLatencyAffectsFillTiming:
     def test_latency_moves_fill_to_later_record(self) -> None:
         from alpha_algo_backtest_engine import run_backtest
-        from alpha_algo_backtesting import BacktestInput
         from tests.unit.backtest_p16_test_support import make_input, tick, zero_cost
         from decimal import Decimal
 

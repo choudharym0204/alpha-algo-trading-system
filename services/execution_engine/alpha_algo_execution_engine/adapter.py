@@ -10,7 +10,7 @@ Phase 10 owns concrete broker adapters; Phase 9 only defines the boundary.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol

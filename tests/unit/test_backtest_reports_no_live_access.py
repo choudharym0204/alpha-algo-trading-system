@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-import sys
 from pathlib import Path
 
 import alpha_algo_backtest_reports as reports

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
 import pytest
 
-from alpha_algo_backtesting import BacktestTradingMode, SimulationClock, canonical_serialize, content_sha256
+from alpha_algo_backtesting import canonical_serialize, content_sha256
 from alpha_algo_contracts import CandleTimeframe, MarketCandle
 
 INSTRUMENT_ID = UUID("00000000-0000-0000-0000-000000000001")

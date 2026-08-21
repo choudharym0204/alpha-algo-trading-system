@@ -7,7 +7,7 @@ append-only ``pnl_events``; unrealized is passed in separately (mark-to-market).
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import timezone
 from decimal import Decimal
 
 from alpha_algo_pnl_engine.accounting import round_money

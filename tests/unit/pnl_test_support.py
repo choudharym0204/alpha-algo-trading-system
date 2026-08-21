@@ -6,7 +6,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from threading import Lock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from alpha_algo_pnl_engine.contracts import (
     CostComponent,
@@ -15,7 +15,7 @@ from alpha_algo_pnl_engine.contracts import (
     PnlSnapshot,
 )
 from alpha_algo_pnl_engine.errors import DuplicateExecutionError, PnlPersistenceError
-from alpha_algo_position_engine.contracts import PositionFill, PositionSnapshot
+from alpha_algo_position_engine.contracts import PositionFill
 
 
 class _FakePosition:

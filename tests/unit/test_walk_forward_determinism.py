@@ -10,7 +10,6 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-import pytest
 
 from alpha_algo_contracts import MarketTick
 from alpha_algo_backtesting import BacktestInput
@@ -25,7 +24,6 @@ from alpha_algo_backtest_engine import (
 from alpha_algo_walk_forward import (
     WalkForwardConfig,
     WindowBacktestResult,
-    aggregate_periods,
     assess_overfitting,
     build_windows,
     run_walk_forward,

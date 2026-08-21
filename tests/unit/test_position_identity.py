@@ -31,7 +31,7 @@ def test_position_key_is_deterministic():
 
 
 def test_position_key_distinguishes_dimensions():
-    a, b, c, d = uuid4(), uuid4(), uuid4(), uuid4()
+    a, b, c, _ = uuid4(), uuid4(), uuid4(), uuid4()
     base = compute_position_key(strategy_run_id=a, instrument_id=b, trading_mode="PAPER")
     assert base != compute_position_key(strategy_run_id=c, instrument_id=b, trading_mode="PAPER")
     assert base != compute_position_key(strategy_run_id=a, instrument_id=c, trading_mode="PAPER")

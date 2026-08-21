@@ -10,7 +10,6 @@ from alpha_algo_contracts import MarketTick
 
 from alpha_algo_backtest_engine import (
     CostModel,
-    EquityPoint,
     IntentSide,
     IntentType,
     OrderIntent,

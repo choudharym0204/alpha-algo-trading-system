@@ -56,7 +56,7 @@ def test_same_identity_different_evidence_is_conflict():
         positions_broker=(make_position_obs(source="broker", account_id=acc, instrument_id=inst, quantity=90),),
     )
 
-    r1 = engine.run(scope=_scope(acc), inputs=inputs_a)
+    _ = engine.run(scope=_scope(acc), inputs=inputs_a)
     r2 = engine.run(scope=_scope(acc), inputs=inputs_b)
 
     assert r2.run.conflicts == 1

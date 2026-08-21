@@ -9,7 +9,7 @@ immutable fill trail. It performs no I/O, no persistence, and no wall-clock
 reads: all timestamps come from the injected clock (ADR-0007).
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal

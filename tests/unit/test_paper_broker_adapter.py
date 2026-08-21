@@ -342,7 +342,7 @@ def test_missing_reference_price_rejects() -> None:
 
 def test_reference_price_for_wrong_instrument_is_rejected() -> None:
     adapter = _adapter()
-    request = _request()
+    _ = _request()
     # tamper: submit with a request whose instrument has no reference by using
     # an instrument not in the adapter mapping
     other_instrument_request = BrokerOrderRequest(

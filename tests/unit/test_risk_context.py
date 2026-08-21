@@ -81,7 +81,6 @@ def test_projected_position_uses_authoritative_value():
 
 
 def test_sell_reduces_projected_position():
-    from alpha_algo_contracts import StrategySignal
 
     signal = make_buy_signal()
     signal = signal.model_copy(update={"action": SignalAction.SELL})

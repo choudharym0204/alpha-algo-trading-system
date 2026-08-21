@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 from uuid import UUID
 
 from alpha_algo_reconciliation_engine.contracts import (
@@ -19,7 +18,6 @@ from alpha_algo_reconciliation_engine.contracts import (
     EntityType,
     ExecutionObservation,
     FundsObservation,
-    ObservationStatus,
     OrderObservation,
     PositionObservation,
     ResolutionStatus,
@@ -29,7 +27,7 @@ from alpha_algo_reconciliation_engine.identity import (
     compute_discrepancy_key,
     discrepancy_content_hash,
 )
-from alpha_algo_reconciliation_engine.tolerance import Tolerance, timestamps_close, within
+from alpha_algo_reconciliation_engine.tolerance import Tolerance, within
 
 
 @dataclass(frozen=True)
