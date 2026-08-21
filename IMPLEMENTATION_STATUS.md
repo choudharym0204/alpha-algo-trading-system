@@ -309,6 +309,16 @@ Phase 23 was **implemented and TESTED** on 2026-08-21 (see `P23-session-report.m
 
 ---
 
+## 0x. Phase 24 - Controlled LIVE Readiness (TESTED — SHADOW→FULL progression controller)
+
+Phase 24 was **implemented and TESTED** on 2026-08-21 (see `P24-session-report.md`, `P24-review.md`, `docs/live-release-readiness.md`). "Controlled LIVE readiness" closed the last tracked capability — `Live release - SHADOW→FULL` (§5.14, target phase 24) — with the required "controlled progression". The single gap was the absence of a release-stage concept + a controlled-progression controller. Added (additively, in `services/risk_engine/alpha_algo_risk_engine/gates.py`): `LiveReleaseStage` (`DISABLED → SHADOW → FULL`), `LiveReleaseDecision` (immutable, tz-aware, self-validating), and `LiveReleaseController` — a fail-closed state machine that starts `DISABLED`, advances `SHADOW`/`FULL` only through re-evaluation of the 17 LIVE safety gates + global halt (kill switch) + circuit breaker with an audited actor/reason, and can `disable()` back to `DISABLED` at any time. `can_submit_live(live_trading_enabled)` is an **advisory** readiness signal (default `False`).
+
+**Verification (real evidence):** 12 new tests (`tests/unit/test_live_release.py`); full backend regression → **1695 passed** (1683 baseline, zero regressions); `ruff` clean; security scan clean; migration graph OK. LIVE remains **fail-closed** (`LIVE_TRADING_ENABLED=false`, `GLOBAL_TRADING_HALT=true`); reaching `FULL` does **not** enable real order submission (hard guards `LiveModeRule`/`GlobalHaltRule`/broker `_guard_live` unchanged). `TradingMode`, broker adapters, and all tested engines are untouched. Actual SHADOW order routing and real FULL submission are explicitly out of scope (no real providers in this environment). The phase map ends at Phase 24 — **no further phase started**.
+
+**Status:** Phase 24 is **TESTED**. No further phase started.
+
+---
+
 ## 1. Current Product Maturity Level
 
 **LEVEL 1 - FOUNDATION.**
@@ -652,7 +662,7 @@ Columns: `Capability | Current Status | Target Phase | Owner/Module | Dependenci
 | CI/CD - format/lint/type | MISSING | 22 | `.github/workflows/ci.yml` | ruff/black/mypy | CI runs checks |
 | CI/CD - test/security/build/migration | PARTIAL | 22 | `.github/workflows/ci.yml` | test matrix + Docker | CI full pipeline |
 | Live release - safety gates (24+) | TESTED | 23 | `gates.py` (`LiveSafetyGateEvaluator` + 17 gates) | all engines + controls | all gates verified (evaluator + tests) |
-| Live release - SHADOW→FULL | MISSING | 24 | - | Phase 23 + ops | controlled progression |
+| Live release - SHADOW→FULL | TESTED | 24 | `gates.py` (`LiveReleaseController` + `LiveReleaseStage`) | Phase 23 + ops | controlled progression (DISABLED→SHADOW→FULL, gated) |
 | Kill switch | TESTED | 23 | `gates.py` (`GlobalHaltController`) | live orchestration | halts live instantly (activate/is_halted) |
 | Circuit breaker (actual) | TESTED | 23 | `circuit_breaker.py` (`CircuitBreaker`/`Registry`, wired into risk service) | live wiring | trips + resets |
 

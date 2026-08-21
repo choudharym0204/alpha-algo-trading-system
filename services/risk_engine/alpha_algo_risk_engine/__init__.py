@@ -50,6 +50,9 @@ from alpha_algo_risk_engine.engine import (
 from alpha_algo_risk_engine.gates import (
     GlobalHaltController,
     GlobalHaltState,
+    LiveReleaseController,
+    LiveReleaseDecision,
+    LiveReleaseStage,
     LiveSafetyGate,
     LiveSafetyGateDecision,
     LiveSafetyGateEvaluator,
@@ -104,6 +107,9 @@ __all__ = [
     # gates
     "GlobalHaltController",
     "GlobalHaltState",
+    "LiveReleaseController",
+    "LiveReleaseDecision",
+    "LiveReleaseStage",
     "LiveSafetyGate",
     "LiveSafetyGateDecision",
     "LiveSafetyGateEvaluator",
